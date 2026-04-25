@@ -60,7 +60,21 @@ SCN/LSN 顺序保证等方面的设计差异。
 - PostgreSQL / GaussDB 现状（单 walwriter + 8 WAL insert lock）
 - GaussDB 学 Oracle 的分层改造路径（O_DSYNC → DSS 裸卷 → 多 walwriter → strand 化 buffer）
 
-### 5. [GaussDB 可观测性与诊断方法论](./gaussdb-observability-methodology.md)
+### 5. [GaussDB Dorado 双集群同步等待事件全集](./gaussdb-dorado-wait-events-complete.md) ⭐ 推荐先看
+
+把 Dorado 双集群（SS_DORADO_CLUSTER）共享盘 sync 同步架构下，
+一次 commit 涉及的**全部 8 类等待事件**统一梳理成一份完整地图。
+
+覆盖：
+- 8 大等待事件逐个详解（A~I 段 + 旁路）：WALInsertLock / WALBufMappingLock / walFlushWaitLock / WALWriteLock / WALWrite (SharedStorageWalWrite) / fsync / SharedStorageCtlInfoWriter / wait wal sync / wait transaction sync
+- 开源 openGauss vs 企业版 GaussDB 事件对照表
+- 事件之间的"配对关系"（F vs I / F vs H / wait wal sync vs wait transaction sync）
+- 完整判别矩阵（3 事件组合 + 2 事件组合）
+- Dorado 双集群完整 commit 时间轴（带所有事件标注）
+- 关键源码锚点完整索引（主链路 + 旁路 + walsender + 宏定义 + 事件名映射）
+- 农行场景的特征模式确诊
+
+### 6. [GaussDB 可观测性与诊断方法论](./gaussdb-observability-methodology.md)
 
 GaussDB 等待事件采样、慢 SQL 诊断、短暂性能 spike 捕获、日志查看的方法论
 与工具，含与 Oracle 同类机制的横向对比。
