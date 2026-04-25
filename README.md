@@ -1,7 +1,8 @@
 # GaussDB 技术分析
 
 基于 openGauss 源码（`~/opengauss/source`）整理的 GaussDB 内核技术分析笔记，
-重点覆盖等待事件源码解析、WAL 并行写架构对比、以及 Dorado 双集群 sync 同步机制。
+重点覆盖等待事件源码解析、WAL 并行写架构对比、Dorado 双集群 sync 同步机制，
+以及可观测性方法论。
 
 ## 文档索引
 
@@ -20,16 +21,18 @@ Dorado 双集群共享盘 sync 架构下 `wait wal sync` / `wait transaction syn
 
 ### 2. [GaussDB 等待事件扩展分析](./gaussdb-wait-events-extended-analysis.md)
 
-在 wait-wal-sync 基础分析上的扩展发现。
+在 wait-wal-sync 基础分析上的扩展发现（1480 行完整版）。
 
 覆盖：
 - `pg_thread_wait_status` 里"commit 线程堵 insert 线程"根因（慢 commit + MVCC 唯一键可见性）
 - `wait transaction sync` 是 `wait wal sync` 的级联次生症状（因果链 + 代码锚点）
-- `wait wal sync` 代码级精确边界（`syncrep.cpp:315→505`）
+- `wait wal sync` 代码级精确边界（`syncrep.cpp:315→505`）+ 5 个子段完整代码
 - 10ms 自旋快路径是观测盲区
 - SS_DORADO_CLUSTER 下 `wait wal sync` 真实语义（等备集群 redo apply，不是等 Dorado 同步）
 - 关键代码证据 `walsender.cpp:2987`（apply vs flush 语义差异）
 - 三种 `wait wal sync` 高的情况及判别矩阵
+- 双集群 4 条物理链路（3 条 SAN + 1 条 IP）
+- 完整数据流 + 跨机房双光纤的细节
 
 ### 3. [GaussDB SS_DORADO_CLUSTER 双通道架构](./gaussdb-ss-dorado-dual-channel.md)
 
@@ -56,6 +59,19 @@ SCN/LSN 顺序保证等方面的设计差异。
 - MySQL 8.0 Scalable Redo Log（lock-free buffer + 4 专职线程流水线）
 - PostgreSQL / GaussDB 现状（单 walwriter + 8 WAL insert lock）
 - GaussDB 学 Oracle 的分层改造路径（O_DSYNC → DSS 裸卷 → 多 walwriter → strand 化 buffer）
+
+### 5. [GaussDB 可观测性与诊断方法论](./gaussdb-observability-methodology.md)
+
+GaussDB 等待事件采样、慢 SQL 诊断、短暂性能 spike 捕获、日志查看的方法论
+与工具，含与 Oracle 同类机制的横向对比。
+
+覆盖：
+- LAS（local_active_session）采样误差分析（4 个场景图示）
+- Oracle ASH vs GaussDB LAS 全方位对比（7 个维度 + 差距可视化）
+- GaussDB 类似 v$sqlstat 的视图：`dbe_perf.statement` / `statement_history`
+- 短暂性能 spike 捕获（0.3→0.5ms 持续 2 秒的 5 种方案 + 生产架构推荐）
+- GaussDB 监听日志查看（`$GAUSSLOG/pg_log/`）
+- GaussDB 时间戳处理函数（`date_trunc` / `TRUNC` 等）
 
 ## 源码基础
 
@@ -88,5 +104,6 @@ SCN/LSN 顺序保证等方面的设计差异。
 
 1. 新手先看 [SS_DORADO 双通道架构](./gaussdb-ss-dorado-dual-channel.md) 建立整体架构认知
 2. 再看 [wait wal sync 源码分析](./gaussdb-wait-wal-sync-analysis.md) 理解 commit 时间轴
-3. 然后看 [等待事件扩展分析](./gaussdb-wait-events-extended-analysis.md) 掌握诊断模式
-4. 最后看 [WAL Writer 跨数据库对比](./wal-writer-architecture-comparison.md) 了解优化空间
+3. 然后看 [等待事件扩展分析](./gaussdb-wait-events-extended-analysis.md) 掌握诊断模式（重点）
+4. 接着看 [可观测性方法论](./gaussdb-observability-methodology.md) 学采样/诊断技巧
+5. 最后看 [WAL Writer 跨数据库对比](./wal-writer-architecture-comparison.md) 了解优化空间
